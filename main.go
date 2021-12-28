@@ -20,9 +20,9 @@ var client *mongo.Client
 
 type Testing []struct {
 	Symbol           string  `json:"symbol" bson:"symbol"`
-	Price_24h        float64 `json:"price_24h" bson:"price_24h"`
-	Volume_24h       float64 `json:"volume_24h" bson:"volume_24h"`
-	Last_trade_price float64 `json:"last_trade_price" bson:"last_trade_price"`
+	Price_24h        float64 `json:"price_24h" bson:"price_24h,inline"`
+	Volume_24h       float64 `json:"volume_24h" bson:"volume_24h,inline"`
+	Last_trade_price float64 `json:"last_trade_price" bson:"last_trade_price,inline"`
 }
 
 func main() {
@@ -68,7 +68,7 @@ func getAll() []primitive.D {
 }
 
 func workWithDb(client *mongo.Client) {
-
+	defer time.Sleep(30 * time.Second)
 	collection := client.Database("test").Collection("Testing")
 
 	resp, err := http.Get("https://api.blockchain.com/v3/exchange/tickers")
@@ -85,9 +85,11 @@ func workWithDb(client *mongo.Client) {
 	checkErr(err)
 
 	for _, rec := range f {
-		_, err := collection.InsertOne(context.TODO(), rec)
+		opts := options.Update().SetUpsert(true)
+		filter := bson.D{{"symbol", rec.Symbol}}
+		update := bson.D{{"$set", bson.D{{"price_24h", rec.Price_24h}, {"volume_24h", rec.Volume_24h}, {"last_trade_price", rec.Last_trade_price}}}}
+		_, err := collection.UpdateOne(context.TODO(), filter, update, opts)
 		checkErr(err)
-		time.Sleep(30 * time.Second)
 	}
 }
 
